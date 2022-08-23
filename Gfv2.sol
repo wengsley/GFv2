@@ -520,7 +520,7 @@ contract GFToken is BEP20, Ownable {
     function symbol() public view override returns (string memory) {
         return _symbol;
     }
-    
+
     function decimals() public view override returns (uint8) {
         return _decimals;
     }
@@ -760,7 +760,6 @@ contract GFToken is BEP20, Ownable {
         // split the contract balance into thirds
         uint256 halfOfLiquify = contractTokenBalance.div(4);
         uint256 otherHalfOfLiquify = contractTokenBalance.div(4);
-        uint256 portionForFees = contractTokenBalance.sub(halfOfLiquify).sub(otherHalfOfLiquify);
 
         // capture the contract's current ETH balance.
         // this is so that we can capture exactly the amount of ETH that the
@@ -816,7 +815,7 @@ contract GFToken is BEP20, Ownable {
             tokenAmount,
             0, // slippage is unavoidable
             0, // slippage is unavoidable
-            owner(),
+            owner,
             block.timestamp
         );
     }
@@ -827,7 +826,7 @@ contract GFToken is BEP20, Ownable {
         address sender,
         address receiver,
         uint256 tAmount
-    ) private view returns (uint256) {
+    ) public payable returns (uint256) {
        
         if(tAmount == 0) return 0;
 
