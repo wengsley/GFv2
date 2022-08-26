@@ -31,67 +31,101 @@ interface BEP20 {
     event Approval(address indexed _owner, address indexed _spender, uint256 _value);
 }
 
+// abstract contract Ownable {
+//     address internal owner;
+//     mapping (address => bool) internal authorizations;
+
+//     constructor(address _owner) {
+//         owner = _owner;
+//         authorizations[_owner] = true;
+//     }
+
+//     /**
+//      * Function modifier to require caller to be contract owner
+//      */
+//     modifier onlyOwner() {
+//         require(isOwner(msg.sender), "!OWNER"); _;
+//     }
+
+//     /**
+//      * Function modifier to require caller to be authorized
+//      */
+//     modifier authorized() {
+//         require(isAuthorized(msg.sender), "!AUTHORIZED"); _;
+//     }
+
+//     /**
+//      * Authorize address. Owner only
+//      */
+//     function authorize(address adr) public onlyOwner {
+//         authorizations[adr] = true;
+//     }
+
+//     /**
+//      * Remove address' authorization. Owner only
+//      */
+//     function unauthorize(address adr) public onlyOwner {
+//         authorizations[adr] = false;
+//     }
+
+//     /**
+//      * Check if address is owner
+//      */
+//     function isOwner(address account) public view returns (bool) {
+//         return account == owner;
+//     }
+
+//     /**
+//      * Return address' authorization status
+//      */
+//     function isAuthorized(address adr) public view returns (bool) {
+//         return authorizations[adr];
+//     }
+
+//     /**
+//      * Transfer ownership to new address. Caller must be owner. Leaves old owner authorized
+//      */
+//     function transferOwnership(address payable adr) public onlyOwner {
+//         owner = adr;
+//         authorizations[adr] = true;
+//         emit OwnershipTransferred(adr);
+//     }
+
+//     event OwnershipTransferred(address owner);
+// }
+
 abstract contract Ownable {
-    address internal owner;
-    mapping (address => bool) internal authorizations;
+    address private _owner;
+    address private _previousOwner;
+    uint256 private _lockTime;
 
-    constructor(address _owner) {
-        owner = _owner;
-        authorizations[_owner] = true;
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+    constructor ()  {
+        address msgSender = msg.sender;
+        _owner = msgSender;
+        emit OwnershipTransferred(address(0), msgSender);
     }
 
-    /**
-     * Function modifier to require caller to be contract owner
-     */
+    function owner() public view returns (address) {
+        return _owner;
+    }   
+    
     modifier onlyOwner() {
-        require(isOwner(msg.sender), "!OWNER"); _;
+        require(_owner == msg.sender, "Ownable: caller is not the owner");
+        _;
+    }
+    
+    function renounceOwnership() public virtual onlyOwner {
+        emit OwnershipTransferred(_owner, address(0));
+        _owner = address(0);
     }
 
-    /**
-     * Function modifier to require caller to be authorized
-     */
-    modifier authorized() {
-        require(isAuthorized(msg.sender), "!AUTHORIZED"); _;
+    function transferOwnership(address newOwner) public virtual onlyOwner {
+        require(newOwner != address(0), "Ownable: new owner is the zero address");
+        emit OwnershipTransferred(_owner, newOwner);
+        _owner = newOwner;
     }
-
-    /**
-     * Authorize address. Owner only
-     */
-    function authorize(address adr) public onlyOwner {
-        authorizations[adr] = true;
-    }
-
-    /**
-     * Remove address' authorization. Owner only
-     */
-    function unauthorize(address adr) public onlyOwner {
-        authorizations[adr] = false;
-    }
-
-    /**
-     * Check if address is owner
-     */
-    function isOwner(address account) public view returns (bool) {
-        return account == owner;
-    }
-
-    /**
-     * Return address' authorization status
-     */
-    function isAuthorized(address adr) public view returns (bool) {
-        return authorizations[adr];
-    }
-
-    /**
-     * Transfer ownership to new address. Caller must be owner. Leaves old owner authorized
-     */
-    function transferOwnership(address payable adr) public onlyOwner {
-        owner = adr;
-        authorizations[adr] = true;
-        emit OwnershipTransferred(adr);
-    }
-
-    event OwnershipTransferred(address owner);
 }
 
 // abstract contract Ownable {
@@ -103,8 +137,8 @@ abstract contract Ownable {
 
 //     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
-//     constructor (address owner)  {
-//         address msgSender = owner;
+//     constructor ()  {
+//          address msgSender = msg.sender;
 //         _owner = msgSender;
 //         emit OwnershipTransferred(address(0), msgSender);
 //     }
@@ -118,22 +152,22 @@ abstract contract Ownable {
 //         _;
 //     }
 
-//     modifier onlySuperOwner() {
-//         require(isSuperOwner(msg.sender), "Ownable: caller is not Super Owner");
-//         _;
-//     }
+//     // modifier onlySuperOwner() {
+//     //     require(isSuperOwner(msg.sender), "Ownable: caller is not Super Owner");
+//     //     _;
+//     // }
 
-//     function isSuperOwner(address owner) public view returns (bool) {
-//         return _superOwner[owner];
-//     }
+//     // function isSuperOwner(address owner) public view returns (bool) {
+//     //     return _superOwner[owner];
+//     // }
 
-//     function assignSuperOwner(address owner) public onlyOwner {
-//         _superOwner[owner] = true;
-//     }
+//     // function assignSuperOwner(address owner) public onlyOwner {
+//     //     _superOwner[owner] = true;
+//     // }
 
-//     function removeSuperOwner(address owner) public onlyOwner {
-//         _superOwner[owner] = false;
-//     }
+//     // function removeSuperOwner(address owner) public onlyOwner {
+//     //     _superOwner[owner] = false;
+//     // }
     
 //     function renounceOwnership() public virtual onlyOwner {
 //         emit OwnershipTransferred(_owner, address(0));
@@ -489,8 +523,8 @@ contract GFToken is BEP20, Ownable {
     }
     
 
-    constructor() Ownable(msg.sender){
-        address _owner = owner;
+    constructor() {
+        address _owner = msg.sender;
         address _DEAD = _DeadPoolAddress;
 
         router = PancakeSwapRouter(0x10ED43C718714eb63d5aA57B78B54704E256024E);
@@ -530,7 +564,7 @@ contract GFToken is BEP20, Ownable {
     }
 
     function getOwner() external view override returns (address) { 
-        return owner; 
+        return msg.sender; 
     }
 
     function balanceOf(address account) public view override returns (uint256) {
@@ -815,7 +849,7 @@ contract GFToken is BEP20, Ownable {
             tokenAmount,
             0, // slippage is unavoidable
             0, // slippage is unavoidable
-            owner,
+            msg.sender,
             block.timestamp
         );
     }
@@ -838,7 +872,7 @@ contract GFToken is BEP20, Ownable {
             //SPECIAL CASE TO HANDLE FAST SELLER in 24 hours
 
             //GET MULTIPLIER, ONLY FOR SELL
-            uint256 sellFee = getTotalFee( sender,receiver);
+            uint256 sellFee = getTotalFee(receiver);
 
             //GET SELL AMOUNT AFTER MULTIPLY BY MULTIPLIER
             uint256 sellFeeAmount = tAmount.mul(sellFee).div(_feeDenominator);
@@ -863,7 +897,7 @@ contract GFToken is BEP20, Ownable {
             if (_buyNFTFee == 0) return 0;
 
             // GET BUY FEE
-            uint256 buyFee = getTotalFee( sender,receiver);
+            uint256 buyFee = getTotalFee(receiver);
 
             //GET BUY AMOUNT
             uint256 buyFeeAmount = tAmount.mul(buyFee).div(_feeDenominator);
@@ -918,7 +952,7 @@ contract GFToken is BEP20, Ownable {
     }
 
     // GET 
-    function getTotalFee(address from, address to) public view returns (uint256) 
+    function getTotalFee(address to) public view returns (uint256) 
     {
         uint256 multiplier = PreventDumpWithMultiplier();
         bool firstFewBlocks = AntSni();
