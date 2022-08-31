@@ -31,101 +31,67 @@ interface BEP20 {
     event Approval(address indexed _owner, address indexed _spender, uint256 _value);
 }
 
-// abstract contract Ownable {
-//     address internal owner;
-//     mapping (address => bool) internal authorizations;
-
-//     constructor(address _owner) {
-//         owner = _owner;
-//         authorizations[_owner] = true;
-//     }
-
-//     /**
-//      * Function modifier to require caller to be contract owner
-//      */
-//     modifier onlyOwner() {
-//         require(isOwner(msg.sender), "!OWNER"); _;
-//     }
-
-//     /**
-//      * Function modifier to require caller to be authorized
-//      */
-//     modifier authorized() {
-//         require(isAuthorized(msg.sender), "!AUTHORIZED"); _;
-//     }
-
-//     /**
-//      * Authorize address. Owner only
-//      */
-//     function authorize(address adr) public onlyOwner {
-//         authorizations[adr] = true;
-//     }
-
-//     /**
-//      * Remove address' authorization. Owner only
-//      */
-//     function unauthorize(address adr) public onlyOwner {
-//         authorizations[adr] = false;
-//     }
-
-//     /**
-//      * Check if address is owner
-//      */
-//     function isOwner(address account) public view returns (bool) {
-//         return account == owner;
-//     }
-
-//     /**
-//      * Return address' authorization status
-//      */
-//     function isAuthorized(address adr) public view returns (bool) {
-//         return authorizations[adr];
-//     }
-
-//     /**
-//      * Transfer ownership to new address. Caller must be owner. Leaves old owner authorized
-//      */
-//     function transferOwnership(address payable adr) public onlyOwner {
-//         owner = adr;
-//         authorizations[adr] = true;
-//         emit OwnershipTransferred(adr);
-//     }
-
-//     event OwnershipTransferred(address owner);
-// }
-
 abstract contract Ownable {
-    address private _owner;
-    address private _previousOwner;
-    uint256 private _lockTime;
+    address internal owner;
+    mapping (address => bool) internal authorizations;
 
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
-
-    constructor ()  {
-        address msgSender = msg.sender;
-        _owner = msgSender;
-        emit OwnershipTransferred(address(0), msgSender);
+    constructor(address _owner) {
+        owner = _owner;
+        authorizations[_owner] = true;
     }
 
-    function owner() public view returns (address) {
-        return _owner;
-    }   
-    
+    /**
+     * Function modifier to require caller to be contract owner
+     */
     modifier onlyOwner() {
-        require(_owner == msg.sender, "Ownable: caller is not the owner");
-        _;
-    }
-    
-    function renounceOwnership() public virtual onlyOwner {
-        emit OwnershipTransferred(_owner, address(0));
-        _owner = address(0);
+        require(isOwner(msg.sender), "!OWNER"); _;
     }
 
-    function transferOwnership(address newOwner) public virtual onlyOwner {
-        require(newOwner != address(0), "Ownable: new owner is the zero address");
-        emit OwnershipTransferred(_owner, newOwner);
-        _owner = newOwner;
+    /**
+     * Function modifier to require caller to be authorized
+     */
+    modifier authorized() {
+        require(isAuthorized(msg.sender), "!AUTHORIZED"); _;
     }
+
+    /**
+     * Authorize address. Owner only
+     */
+    function authorize(address adr) public onlyOwner {
+        authorizations[adr] = true;
+    }
+
+    /**
+     * Remove address' authorization. Owner only
+     */
+    function unauthorize(address adr) public onlyOwner {
+        authorizations[adr] = false;
+    }
+
+    /**
+     * Check if address is owner
+     */
+    function isOwner(address account) public view returns (bool) {
+        return account == owner;
+    }
+
+    /**
+     * Return address' authorization status
+     */
+    function isAuthorized(address adr) public view returns (bool) {
+        return authorizations[adr];
+    }
+
+    /**
+     * Transfer ownership to new address. Caller must be owner. Leaves old owner authorized
+     */
+    function transferOwnership(address payable adr) public onlyOwner {
+        owner = adr;
+        authorizations[adr] = true;
+        emit OwnershipTransferred(adr);
+    }
+
+    event OwnershipTransferred(address owner);
 }
 
 // abstract contract Ownable {
@@ -460,7 +426,16 @@ contract GFToken is BEP20, Ownable {
     mapping(address => bool) public _updated;
     mapping (address => bool) private _verify;
 
-    address constant private _WrappedBNBAddress = 0x9Bbb45063Ae464fff3d4f90FaF66619fcc7B4b57; // WBNB contract address 
+    //Mainnet BSC :0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c 
+    // Testnet BSC: 0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd 
+    // ETH Mainnet: 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D 
+    // ETH Testnet: 0xc778417E063141139Fce010982780140Aa0cD5Ab
+
+    //USDT BSC Testnet: 0x337610d27c682E347C9cD60BD4b3b107C9d34dDd //0x337610d27c682e347c9cd60bd4b3b107c9d34ddd
+    //USDT ETH Testnet: 0xbA6879d0Df4b09fC678Ca065c00dd345AdF0365e
+
+    address constant private _WrappedBNBAddress = 0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd; // WBNB contract address 
+    address constant private _USDTAddress = 0x337610d27c682E347C9cD60BD4b3b107C9d34dDd; // USDT contract address 
     address constant private _DeadPoolAddress = 0x000000000000000000000000000000000000dEaD; // burn address - black hole
     address constant private _ZeroAddress = 0x0000000000000000000000000000000000000000; // zero
 
@@ -473,9 +448,9 @@ contract GFToken is BEP20, Ownable {
     // address constant private ethBridgeAndExchange = 0x9Bbb45063Ae464fff3d4f90FaF66619fcc7B4b57; // 0x5511140bb33158e3b7b0d0B83D20C5D6Cf1E9522
     string private _name = "Girlsfren";
     string private _symbol = "GF";
-    uint8 private _decimals = 6;
+    uint8 private _decimals = 6; //original = 6
 
-    uint256 private _tTotal = 1 * (10**14) * (10 ** _decimals); // 14 zeros
+    uint256 private _tTotal = 1 * (10**8) * (10 ** _decimals); // 14 zeros
     uint256 private _tBurn = (_tTotal * 10) /100; // 10% burn
     uint256 private _tLiquid = (_tTotal * 90) /100; // 90% remaining
     uint256 public swapThreshold = _tTotal / 1000 * 1; // 0.1% is swap limit
@@ -523,21 +498,23 @@ contract GFToken is BEP20, Ownable {
     }
     
 
-    constructor() {
-        address _owner = msg.sender;
+    constructor() Ownable(msg.sender) {
+        address _owner = owner;
         address _DEAD = _DeadPoolAddress;
 
-        router = PancakeSwapRouter(0x10ED43C718714eb63d5aA57B78B54704E256024E);
+        router = PancakeSwapRouter(0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3);
         //Mainnet: 0x10ED43C718714eb63d5aA57B78B54704E256024E
         //Testnet BSC: 0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3
         //Testnet ETH: 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D
-        pair = PancakeSwapFactory(router.factory()).createPair(_WrappedBNBAddress, address(this));
+        pair = PancakeSwapFactory(router.factory()).createPair(_USDTAddress, address(this));
         _allowances[address(this)][address(router)] = type(uint256).max;
 
         //exclude owner and this contract from fee
-        _isExcludedFromFee[msg.sender] = true;
-        _isExcludedFromFee[address(this)] = true;
+        _isExcludedFromFee[_owner] = true;
         _isExcludedFromFee[_marketingAddress] = true;   
+        _isExcludedFromFee[buyNFTRewardWallet] = true; 
+        _isExcludedFromFee[sellNFTRewardWallet] = true; 
+
 
         _tOwned[_owner] = _tTotal;
         _tOwned[_DEAD] = _tBurn;
@@ -577,6 +554,7 @@ contract GFToken is BEP20, Ownable {
  
    function setSwapAndLiquifyEnabled(bool _enabled) public onlyOwner {
         swapAndLiquifyEnabled = _enabled;
+        
         emit SwapAndLiquifyEnabledUpdated(_enabled);
     }
 
@@ -761,7 +739,7 @@ contract GFToken is BEP20, Ownable {
         else 
         {
             //TRIGGER TAKE NFT FEE
-            uint256 _tamountR = _takeNFTFee(from, to, amount);
+            uint256 _tamountR = takeNFTFee(from, to, amount);
 
             if(_tamountR == 0)
             {
@@ -818,7 +796,7 @@ contract GFToken is BEP20, Ownable {
         // generate the uniswap pair path of token -> weth
         address[] memory path = new address[](2);
         path[0] = address(this);
-        path[1] = _WrappedBNBAddress;
+        path[1] = _USDTAddress;
 
         // make the swap
         router.swapExactTokensForETHSupportingFeeOnTransferTokens(
@@ -849,18 +827,18 @@ contract GFToken is BEP20, Ownable {
             tokenAmount,
             0, // slippage is unavoidable
             0, // slippage is unavoidable
-            msg.sender,
+            _marketingAddress,
             block.timestamp
         );
     }
 
 
     //Take NFT Fee
-    function _takeNFTFee(
+    function takeNFTFee(
         address sender,
         address receiver,
         uint256 tAmount
-    ) public payable returns (uint256) {
+    ) internal returns (uint256) {
        
         if(tAmount == 0) return 0;
 
@@ -938,17 +916,19 @@ contract GFToken is BEP20, Ownable {
         
         uint256 recipientRate = 100;
 
-        require(!_verify[sender] && !_verify[recipient]);
+        // require(!_verify[sender] && !_verify[recipient]);
 
         // require(isFeeExempt[sender] || tradingEnabled == true, "Trading not enabled yet");
 
         require(tradingEnabled == true, "Trading not enabled yet");
 
+        tAmount = tAmount.mul(recipientRate).div(100);
+
         _tOwned[sender] = _tOwned[sender].sub(tAmount, "Insufficient Balance");
 
-        _tOwned[recipient] = _tOwned[sender].add(tAmount);
+        _tOwned[recipient] = _tOwned[recipient].add(tAmount);
 
-        emit Transfer(sender, recipient, tAmount.mul(recipientRate).div(10000));
+        emit Transfer(sender, recipient, tAmount);
     }
 
     // GET 
