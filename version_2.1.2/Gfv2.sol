@@ -2,7 +2,9 @@
  *Submitted for verification at BscScan.com on 2022-06-01
 */
 
-pragma solidity ^0.8.6;
+// pragma solidity ^0.8.6;
+
+pragma solidity >=0.6.0 <0.9.0;
 
 // SPDX-License-Identifier: Unlicensed
 interface BEP20 {
@@ -426,22 +428,28 @@ contract GFToken is BEP20, Ownable {
     mapping(address => bool) public _updated;
     mapping (address => bool) private _verify;
 
-    //Mainnet BSC :0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c 
+    // Mainnet BSC :0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c 
     // Testnet BSC: 0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd 
     // ETH Mainnet: 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D 
     // ETH Testnet: 0xc778417E063141139Fce010982780140Aa0cD5Ab
 
-    //USDT BSC Testnet: 0x337610d27c682E347C9cD60BD4b3b107C9d34dDd //0x337610d27c682e347c9cd60bd4b3b107c9d34ddd
+    //USDT BSC Testnet: 0x337610d27c682E347C9cD60BD4b3b107C9d34dDd 
+    //USDT BSC Mainnet: 0x55d398326f99059ff775485246999027b3197955
     //USDT ETH Testnet: 0xbA6879d0Df4b09fC678Ca065c00dd345AdF0365e
 
+    //BUSD BSC Mainnet: 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56
+    //BUSD BSC Testnet: 0xed24fc36d5ee211ea25a80239fb8c4cfd80f12ee 
+    //BUSD ETH Testnet: null
+
     address constant private _WrappedBNBAddress = 0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd; // WBNB contract address 
-    address constant private _USDTAddress = 0x337610d27c682E347C9cD60BD4b3b107C9d34dDd; // USDT contract address 
+    // address constant private _USDTAddress = 0x55d398326f99059ff775485246999027b3197955; // USDT contract address  
+    address constant private _BUSDAddress = 0xeD24FC36d5Ee211Ea25A80239Fb8C4Cfd80f12Ee; // USDT contract address 
     address constant private _DeadPoolAddress = 0x000000000000000000000000000000000000dEaD; // burn address - black hole
     address constant private _ZeroAddress = 0x0000000000000000000000000000000000000000; // zero
 
     //MARKETING WALLET
     address private buyNFTRewardWallet = 0x72067C1c4608ae8765a9Fb0E24947dC5159310b5;
-    address private sellNFTRewardWallet = 0xB7A88A07e826842aC085D739C6c87dC2fc9C5bBA;
+    address private sellNFTRewardWallet = 0x72067C1c4608ae8765a9Fb0E24947dC5159310b5;
     address constant private projectAddress = 0xCBf1a56b110fa8899f8F5E773eedde05Ca0f31f9;
     address private _marketingAddress = 0x71c8819988FFD77e5983854fc1B1F94596Ec4872; 
 
@@ -455,7 +463,7 @@ contract GFToken is BEP20, Ownable {
     uint256 private _tLiquid = (_tTotal * 90) /100; // 90% remaining
     uint256 public swapThreshold = _tTotal / 1000 * 1; // 0.1% is swap limit
 
-    uint256 public distributorGas = 20000;
+    uint256 public distributorGas = 30000;
     address public fromAddress;
     address public toAddress;
     PancakeSwapRouter public router;
@@ -502,11 +510,11 @@ contract GFToken is BEP20, Ownable {
         address _owner = owner;
         address _DEAD = _DeadPoolAddress;
 
-        router = PancakeSwapRouter(0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3);
+        router = PancakeSwapRouter(0x10ED43C718714eb63d5aA57B78B54704E256024E);
         //Mainnet: 0x10ED43C718714eb63d5aA57B78B54704E256024E
         //Testnet BSC: 0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3
         //Testnet ETH: 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D
-        pair = PancakeSwapFactory(router.factory()).createPair(_USDTAddress, address(this));
+        pair = PancakeSwapFactory(router.factory()).createPair(_BUSDAddress, address(this));
         _allowances[address(this)][address(router)] = type(uint256).max;
 
         //exclude owner and this contract from fee
@@ -720,7 +728,7 @@ contract GFToken is BEP20, Ownable {
         //Handle Swap HERE
         if(allowToSwap())
         { 
-            swapAndLiquify(_tLiquid); 
+            swapAndLiquify(); 
         }
 
         bool takeFee = true;
@@ -768,10 +776,17 @@ contract GFToken is BEP20, Ownable {
         _aveTotalFee = _totalBuyFee.add(_totalSellFee).div(2); // (3+3)/2 = 3
     }
 
-     function swapAndLiquify(uint256 contractTokenBalance) private lockTheSwap {
+     function swapAndLiquify() private lockTheSwap {
         // split the contract balance into thirds
-        uint256 halfOfLiquify = contractTokenBalance.div(4);
-        uint256 otherHalfOfLiquify = contractTokenBalance.div(4);
+        // uint256 halfOfLiquify = contractTokenBalance.div(4);
+        // uint256 otherHalfOfLiquify = contractTokenBalance.div(4);
+
+        uint256 _balanceContract = balanceOf(address(this));
+        uint256 _amtLiq = _balanceContract.mul(_aveLiquidityFee).div(_aveTotalFee.sub(_aveNFTFee)).div(2);
+        uint256 _amtSwap = _balanceContract.sub(_amtLiq);
+
+
+        getAverageSwapFees();
 
         // capture the contract's current ETH balance.
         // this is so that we can capture exactly the amount of ETH that the
@@ -780,27 +795,28 @@ contract GFToken is BEP20, Ownable {
         uint256 initialBalance = address(this).balance;
 
         // swap tokens for ETH
-        swapTokensForEth(halfOfLiquify); // <- this breaks the ETH -> HATE swap when swap+liquify is triggered
+        swapTokensForEth(_amtSwap); // <- this breaks the ETH -> HATE swap when swap+liquify is triggered
 
         // how much ETH did we just swap into?
         // uint256 newBalance = address(this).balance.sub(initialBalance);
 
         // add liquidity to pancakeswap
-        addLiquidity(otherHalfOfLiquify, initialBalance);
+        addLiquidity(_amtLiq, initialBalance);
         
         // emit SwapAndLiquify(halfOfLiquify, newBalance, otherHalfOfLiquify);
     }
 
-    function swapTokensForEth(uint256 tokenAmount) private 
+    function swapTokensForEth(uint256 _amtSwap) private 
     {
+       
         // generate the uniswap pair path of token -> weth
         address[] memory path = new address[](2);
         path[0] = address(this);
-        path[1] = _USDTAddress;
+        path[1] = _BUSDAddress;
 
         // make the swap
         router.swapExactTokensForETHSupportingFeeOnTransferTokens(
-            tokenAmount,
+            _amtSwap,
             0, // accept any amount of ETH
             path,
             address(this),
@@ -809,7 +825,7 @@ contract GFToken is BEP20, Ownable {
     }
 
 
-    function addLiquidity(uint256 tokenAmount, uint256 initialAmount) private 
+    function addLiquidity(uint256 _amtLiq, uint256 initialAmount) private 
     {
         uint256 amountBNB = address(this).balance.sub(initialAmount); //balance before swap
         uint256 totalBNBFee = _aveTotalFee.sub(_aveNFTFee).sub(_aveLiquidityFee).div(2);
@@ -824,7 +840,7 @@ contract GFToken is BEP20, Ownable {
         // add the liquidity
         router.addLiquidityETH{value: amountBNBLiquidity}(
             address(this),
-            tokenAmount,
+            _amtLiq,
             0, // slippage is unavoidable
             0, // slippage is unavoidable
             _marketingAddress,
