@@ -234,8 +234,8 @@ contract GF is BEP20 {
    
     uint256 constant private startingSupply = 1000000;
 
-    string constant private _name = "Girlfren";
-    string constant private _symbol = "GFTEST1";
+    string constant private _name = "Girlsfren";
+    string constant private _symbol = "GF";
     uint8 constant private _decimals = 6;
 
     uint256 constant private _tTotal = startingSupply * 10**_decimals;
@@ -255,11 +255,11 @@ contract GF is BEP20 {
     }
 
     Fees public _taxRates = Fees({
-        buyFee: 1,
-        sellFee: 1,
+        buyFee: 0,
+        sellFee: 0,
         transferFee: 0,
-        buyMarketingFee: 2,
-        sellMarketingFee: 1,
+        buyMarketingFee: 3,
+        sellMarketingFee: 2,
         buyLiquidityFee: 0,
         sellLiquidityFee: 1,
         totalBuyFee: 3,
@@ -283,7 +283,7 @@ contract GF is BEP20 {
     address public bnbPair;
     // address public USDT = 0x337610d27c682E347C9cD60BD4b3b107C9d34dDd;
     // address public USDT = 0x55d398326f99059fF775485246999027B3197955;
-    address public WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c; //mainnet
+    address constant private WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c; // WBNB contract address 
     //address public WBNB = 0x095418A82BC2439703b69fbE1210824F2247D77c //testnet
     address constant public DEAD = 0x000000000000000000000000000000000000dEaD;
 
@@ -322,7 +322,7 @@ contract GF is BEP20 {
         //Testnet BSC: 0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3
         //Testnet ETH: 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D
          // Mainnet BSC :0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c 
-        dexRouter = IRouter02(0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c);
+        dexRouter = IRouter02(0x10ED43C718714eb63d5aA57B78B54704E256024E);
 
         bnbPair = IFactoryV2(dexRouter.factory()).createPair(dexRouter.WETH(), address(this));
         lpPair = IFactoryV2(dexRouter.factory()).createPair(WBNB, address(this));
@@ -373,24 +373,6 @@ contract GF is BEP20 {
         emit OwnershipTransferred(oldOwner, address(0));
     }
 
-    // Function to set an operator to allow someone other the deployer to create things such as launchpads.
-    // Only callable by original deployer.
-    function setOperator(address newOperator) external {
-        require(msg.sender == originalDeployer, "Can only be called by original deployer.");
-        address oldOperator = operator;
-        if (oldOperator != address(0)) {
-            _liquidityHolders[oldOperator] = false;
-            setExcludedFromFees(oldOperator, false);
-        }
-        operator = newOperator;
-        _liquidityHolders[newOperator] = true;
-        setExcludedFromFees(newOperator, true);
-    }
-
-    function renounceOriginalDeployer() external {
-        require(msg.sender == originalDeployer, "Can only be called by original deployer.");
-        originalDeployer = address(0);
-    }
 //===============================================================================================================
 //===============================================================================================================
 //===============================================================================================================
@@ -507,29 +489,22 @@ contract GF is BEP20 {
         taxesAreLocked = true;
     }
 
-    function setTaxes(uint16 buyFee, uint16 sellFee, uint16 transferFee) external onlyOwner {
+    function setBuyTaxes( uint16 buyMarketingFee, uint16 buyLiquidityFee) external onlyOwner {
         require(!taxesAreLocked, "Taxes are locked.");
 
-        _taxRates.buyFee = buyFee;
-        _taxRates.sellFee = sellFee;
-        _taxRates.transferFee = transferFee;
+        require((buyMarketingFee + buyLiquidityFee + _taxRates.buyFee) <= 5 , "Must keep fees at 5% or less");
+
+        _taxRates.buyMarketingFee = buyMarketingFee;
+        _taxRates.buyLiquidityFee = buyLiquidityFee;
     }
 
-    function excludePresaleAddresses(address router, address presale) external onlyOwner {
-        require(allowedPresaleExclusion);
-        require(router != address(this) && presale != address(this), "Just don't.");
-        if (router == presale) {
-            _liquidityHolders[presale] = true;
-            presaleAddresses[presale] = true;
-            setExcludedFromFees(presale, true);
-        } else {
-            _liquidityHolders[router] = true;
-            _liquidityHolders[presale] = true;
-            presaleAddresses[router] = true;
-            presaleAddresses[presale] = true;
-            setExcludedFromFees(router, true);
-            setExcludedFromFees(presale, true);
-        }
+    function setSellTaxes(uint16 sellMarketingFee, uint16 sellLiquidityFee) external onlyOwner {
+        require(!taxesAreLocked, "Taxes are locked.");
+
+        require((_taxRates.sellFee + sellMarketingFee + sellLiquidityFee) <= 5 , "Must keep fees at 5% or less");
+
+        _taxRates.sellMarketingFee = sellMarketingFee;
+        _taxRates.sellLiquidityFee = sellLiquidityFee;
     }
 
     function _hasLimits(address from, address to) internal view returns (bool) {
@@ -660,7 +635,7 @@ contract GF is BEP20 {
         _aveTotalFee = _taxRates.totalBuyFee.add(_taxRates.totalSellFee).div(2); // (3+3)/2 = 3
     }
 
-    function swapAndLiquify() private {
+    function swapAndLiquify() internal {
         getAverageSwapFees();
         // split the contract balance into thirds
         uint256 _balanceContract = balanceOf(address(this));
@@ -676,7 +651,7 @@ contract GF is BEP20 {
         addLiquidity(_amtLiq, initialBalance);        
     }
 
-    function swapTokensForEth(uint256 _amtSwap) private 
+    function swapTokensForEth(uint256 _amtSwap) internal 
     {
        
         // generate the uniswap pair path of token -> weth
@@ -694,7 +669,7 @@ contract GF is BEP20 {
         );
     }
 
-    function addLiquidity(uint256 _amtLiq, uint256 initialAmount) private 
+    function addLiquidity(uint256 _amtLiq, uint256 initialAmount) internal 
     {
         uint256 amountBNB = address(this).balance.sub(initialAmount); //balance before swap
         uint256 totalBNBFee = _aveTotalFee.sub(_aveNFTFee).sub(_aveLiquidityFee).div(2);
