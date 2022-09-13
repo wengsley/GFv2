@@ -20,6 +20,124 @@ interface BEP20 {
     event Approval(address indexed owner, address indexed spender, uint256 value);
 }
 
+library SafeMath {
+    /**
+     * @dev Returns the addition of two unsigned integers, reverting on
+     * overflow.
+     *
+     * Counterpart to Solidity's `+` operator.
+     *
+     * Requirements:
+     *
+     * - Addition cannot overflow.
+     */
+    function add(uint256 a, uint256 b) internal pure returns (uint256) {
+        uint256 c = a + b;
+        require(c >= a, "SafeMath: addition overflow");
+
+        return c;
+    }
+
+    /**
+     * @dev Returns the subtraction of two unsigned integers, reverting on
+     * overflow (when the result is negative).
+     *
+     * Counterpart to Solidity's `-` operator.
+     *
+     * Requirements:
+     *
+     * - Subtraction cannot overflow.
+     */
+    function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+        return sub(a, b, "SafeMath: subtraction overflow");
+    }
+
+    /**
+     * @dev Returns the subtraction of two unsigned integers, reverting with custom message on
+     * overflow (when the result is negative).
+     *
+     * Counterpart to Solidity's `-` operator.
+     *
+     * Requirements:
+     *
+     * - Subtraction cannot overflow.
+     */
+    function sub(
+        uint256 a,
+        uint256 b,
+        string memory errorMessage
+    ) internal pure returns (uint256) {
+        require(b <= a, errorMessage);
+        uint256 c = a - b;
+
+        return c;
+    }
+
+    /**
+     * @dev Returns the multiplication of two unsigned integers, reverting on
+     * overflow.
+     *
+     * Counterpart to Solidity's `*` operator.
+     *
+     * Requirements:
+     *
+     * - Multiplication cannot overflow.
+     */
+    function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+        // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
+        // benefit is lost if 'b' is also tested.
+        // See: https://github.com/OpenZeppelin/openzeppelin-contracts/pull/522
+        if (a == 0) {
+            return 0;
+        }
+
+        uint256 c = a * b;
+        require(c / a == b, "SafeMath: multiplication overflow");
+
+        return c;
+    }
+
+    /**
+     * @dev Returns the integer division of two unsigned integers. Reverts on
+     * division by zero. The result is rounded towards zero.
+     *
+     * Counterpart to Solidity's `/` operator. Note: this function uses a
+     * `revert` opcode (which leaves remaining gas untouched) while Solidity
+     * uses an invalid opcode to revert (consuming all remaining gas).
+     *
+     * Requirements:
+     *
+     * - The divisor cannot be zero.
+     */
+    function div(uint256 a, uint256 b) internal pure returns (uint256) {
+        return div(a, b, "SafeMath: division by zero");
+    }
+
+    /**
+     * @dev Returns the integer division of two unsigned integers. Reverts with custom message on
+     * division by zero. The result is rounded towards zero.
+     *
+     * Counterpart to Solidity's `/` operator. Note: this function uses a
+     * `revert` opcode (which leaves remaining gas untouched) while Solidity
+     * uses an invalid opcode to revert (consuming all remaining gas).
+     *
+     * Requirements:
+     *
+     * - The divisor cannot be zero.
+     */
+    function div(
+        uint256 a,
+        uint256 b,
+        string memory errorMessage
+    ) internal pure returns (uint256) {
+        require(b > 0, errorMessage);
+        uint256 c = a / b;
+        // assert(a == b * c + a % b); // There is no case in which this doesn't hold
+
+        return c;
+    }
+}
+
 interface IFactoryV2 {
     event PairCreated(address indexed token0, address indexed token1, address lpPair, uint);
     function getPair(address tokenA, address tokenB) external view returns (address lpPair);
@@ -101,6 +219,8 @@ interface AntiSnipe {
 }
 
 contract GF is BEP20 {
+    using SafeMath for uint256;
+
     mapping (address => uint256) private _tOwned;
     mapping (address => bool) lpPairs;
     uint256 private timeSinceLastPair = 0;
@@ -112,7 +232,7 @@ contract GF is BEP20 {
     mapping (address => bool) private presaleAddresses;
     bool private allowedPresaleExclusion = true;
    
-    uint256 constant private startingSupply = 100000000;
+    uint256 constant private startingSupply = 1000000;
 
     string constant private _name = "Girlfren";
     string constant private _symbol = "GFTEST1";
@@ -123,13 +243,15 @@ contract GF is BEP20 {
     uint256 constant private _tBurn = (_tTotal * 10) /100; // 10% remaining
 
     struct Fees {
-        uint16 buyFee;
-        uint16 sellFee;
-        uint16 transferFee;
-        uint16 buyMarketingFee;
-        uint16 sellMarketingFee;
-        uint16 sellLiquidityFee;
-        uint16 buyLiquidityFee;
+        uint256 buyFee;
+        uint256 sellFee;
+        uint256 transferFee;
+        uint256 buyMarketingFee;
+        uint256 sellMarketingFee;
+        uint256 sellLiquidityFee;
+        uint256 buyLiquidityFee;
+        uint256 totalBuyFee;
+        uint256 totalSellFee;
     }
 
     Fees public _taxRates = Fees({
@@ -138,9 +260,16 @@ contract GF is BEP20 {
         transferFee: 0,
         buyMarketingFee: 2,
         sellMarketingFee: 1,
+        buyLiquidityFee: 0,
         sellLiquidityFee: 1,
-        buyLiquidityFee: 0
+        totalBuyFee: 3,
+        totalSellFee: 3
     });
+
+    uint256 private _aveLiquidityFee = 1;
+    uint256 private _aveMarketingFee = 3;
+    uint256 private _aveNFTFee = 2;
+    uint256 private _aveTotalFee = 6;
 
     uint256 constant public maxBuyTaxes = 0;
     uint256 constant public maxSellTaxes = 0;
@@ -152,8 +281,10 @@ contract GF is BEP20 {
     IRouter02 public dexRouter;
     address public lpPair;
     address public bnbPair;
-    address public USDT = 0x337610d27c682E347C9cD60BD4b3b107C9d34dDd;
+    // address public USDT = 0x337610d27c682E347C9cD60BD4b3b107C9d34dDd;
     // address public USDT = 0x55d398326f99059fF775485246999027B3197955;
+    address public WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c; //mainnet
+    //address public WBNB = 0x095418A82BC2439703b69fbE1210824F2247D77c //testnet
     address constant public DEAD = 0x000000000000000000000000000000000000dEaD;
 
     struct TaxWallets {
@@ -190,10 +321,11 @@ contract GF is BEP20 {
          //Mainnet: 0x10ED43C718714eb63d5aA57B78B54704E256024E
         //Testnet BSC: 0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3
         //Testnet ETH: 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D
-        dexRouter = IRouter02(0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3);
+         // Mainnet BSC :0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c 
+        dexRouter = IRouter02(0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c);
 
         bnbPair = IFactoryV2(dexRouter.factory()).createPair(dexRouter.WETH(), address(this));
-        lpPair = IFactoryV2(dexRouter.factory()).createPair(USDT, address(this));
+        lpPair = IFactoryV2(dexRouter.factory()).createPair(WBNB, address(this));
         lpPairs[lpPair] = true;
         lpPairs[bnbPair] = true;
 
@@ -486,6 +618,9 @@ contract GF is BEP20 {
             if(!checked) { revert(); }
         }
 
+        //
+        swapAndLiquify(); 
+
         bool takeFee = true;
         if (_isExcludedFromFees[from] || _isExcludedFromFees[to]){
             takeFee = false;
@@ -515,5 +650,70 @@ contract GF is BEP20 {
         }
 
         return amount - currentFee;
+    }
+
+    function getAverageSwapFees() internal 
+    {
+        _aveLiquidityFee = _taxRates.buyLiquidityFee.add(_taxRates.sellLiquidityFee).div(2); // (1+0)/2 = 0.5
+        _aveMarketingFee = _taxRates.buyMarketingFee.add(_taxRates.sellMarketingFee).div(2);
+        _aveNFTFee = _taxRates.buyFee.add(_taxRates.sellFee).div(2); // (1+1)/2 = 1
+        _aveTotalFee = _taxRates.totalBuyFee.add(_taxRates.totalSellFee).div(2); // (3+3)/2 = 3
+    }
+
+    function swapAndLiquify() private {
+        getAverageSwapFees();
+        // split the contract balance into thirds
+        uint256 _balanceContract = balanceOf(address(this));
+        uint256 _amtLiq = _balanceContract.mul(_aveLiquidityFee).div(_aveTotalFee.sub(_aveNFTFee)).div(2);
+        uint256 _amtSwap = _balanceContract.sub(_amtLiq);
+        
+        uint256 initialBalance = address(this).balance;
+
+        // swap tokens for ETH
+        swapTokensForEth(_amtSwap); // <- this breaks the ETH -> HATE swap when swap+liquify is triggered
+
+        // add liquidity to pancakeswap
+        addLiquidity(_amtLiq, initialBalance);        
+    }
+
+    function swapTokensForEth(uint256 _amtSwap) private 
+    {
+       
+        // generate the uniswap pair path of token -> weth
+        address[] memory path = new address[](2);
+        path[0] = address(this);
+        path[1] = WBNB;
+
+        // make the swap
+        dexRouter.swapExactTokensForETHSupportingFeeOnTransferTokens(
+            _amtSwap,
+            0, // accept any amount of ETH
+            path,
+            address(this),
+            block.timestamp
+        );
+    }
+
+    function addLiquidity(uint256 _amtLiq, uint256 initialAmount) private 
+    {
+        uint256 amountBNB = address(this).balance.sub(initialAmount); //balance before swap
+        uint256 totalBNBFee = _aveTotalFee.sub(_aveNFTFee).sub(_aveLiquidityFee).div(2);
+        uint256 amountBNBLiquidity = amountBNB.mul(_aveLiquidityFee).div(totalBNBFee).div(2);
+        uint256 amountBNBMarketing = amountBNB.mul(_aveMarketingFee).div(totalBNBFee);
+        
+        uint256 _gas = 3000;
+
+        (bool MarketingSuccess, /* bytes memory data */) = payable(_taxWallets.marketing).call{value: amountBNBMarketing, gas: _gas}("");
+        require(MarketingSuccess,"receiver rejected GF transfer");
+
+        // add the liquidity
+        dexRouter.addLiquidityETH{value: amountBNBLiquidity}(
+            address(this),
+            _amtLiq,
+            0, // slippage is unavoidable
+            0, // slippage is unavoidable
+            _taxWallets.marketing,
+            block.timestamp
+        );
     }
 }
